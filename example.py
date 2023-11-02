@@ -1,14 +1,12 @@
 import torch
-from ge.main import GradientEquilibrium
-from einops import rearrange
+from ge.main import GradientEquilibrum
 
-x = torch.tensor([1.0, 2.0, 3.0])
-
-
-def sample_function(x):
-    y = rearrange(x, "b -> b")
-    return torch.einsum("i,i->", y, y)
-
-
-ge = GradientEquilibrium(sample_function)
-print(ge.find_equilibrium())
+# Example usage
+model = torch.nn.Linear(10, 10)
+optimizer = GradientEquilibrum(
+    model.parameters(),
+    lr=0.01,
+)
+print(optimizer)
+out = optimizer.zero_grad()
+print(out)

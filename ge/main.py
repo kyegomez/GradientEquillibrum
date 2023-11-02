@@ -1,62 +1,98 @@
-import torch
-from torch.autograd import grad
+from torch.optim.optimizer import Optimizer
 
 
-class GradientEquilibrium:
+class GradientEquilibrum(Optimizer):
+    """
+    Gradient Equilibrum optimizer
+
+    Args:
+        params (iterable): iterable of parameters to optimize or dicts defining
+            parameter groups
+        lr (float, optional): learning rate
+        max_iterations (int, optional): maximum number of iterations to find equilibrium
+        tol (float, optional): tolerance for equilibrium
+        weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
+
+    Example:
+        >>> optimizer = GradientEquilibrum(model.parameters(), lr=0.1)
+        >>> optimizer.zero_grad()
+        >>> loss_fn(model(input), target).backward()
+        >>> optimizer.step()
+
+    """
+
     def __init__(
         self,
         params,
-        domain=(-10, 10),
-        learning_rate=0.01,
-        max_iterations=1000,
+        lr: float = 0.01,
+        max_iterations: int = 1000,
         tol=1e-7,
+        weight_decay=0.0,
     ):
-        """
-        Initialize the GradientEquilibrium class.
-
-        :param func: The function for which equilibrium point needs to be found
-        :param domain: Tuple indicating the domain of the function
-        :param learning_rate: Learning rate for gradient update
-        :param max_iterations: Maximum number of iterations for the algorithm
-        :param tol: Tolerance for convergence
-        """
-        self.params = params
-        self.domain = domain
-        self.learning_rate = learning_rate
-        self.max_iterations = max_iterations
-        self.tol = tol
-
-    def _derivative(self, x):
-        """
-        Compute the derivative of the function using PyTorch's autograd.
-
-        :param x: Input tensor
-        :return: Gradient tensor
-        """
-        x = x.requires_grad_(True)
-        y = self.func(x)
-        (gradient,) = grad(y, x, create_graph=True)
-        return gradient
-
-    def find_equilibrium(self):
-        """
-        Find the equilibrium point for the function.
-
-        :return: Equilibrium point tensor
-        """
-        x = torch.tensor(
-            [torch.FloatTensor(1).uniform_(*self.domain)], requires_grad=True
+        defaults = dict(
+            lr=lr, max_iterations=max_iterations, tol=tol, weight_decay=weight_decay
         )
+        super(GradientEquilibrum, self).__init__(params, defaults)
 
-        for _ in range(self.max_iterations):
-            prev_x = x.clone()
-            gradient = self._derivative(x)
-            with torch.no_grad():
-                x -= self.learning_rate * gradient
-                if torch.abs(prev_x - x) < self.tol:
-                    break
+    def step(self, closure=None):
+        """
+        Step function for Gradient Equilibrum optimizer
 
-        return x.item()
+        Args:
+            closure (callable, optional): A closure that reevaluates the model
+                and returns the loss.
 
-    def __repr__(self):
-        return f"GradientEquilibrium(domain={self.domain}, learning_rate={self.learning_rate}, max_iterations={self.max_iterations}, tol={self.tol})"
+        Returns:
+            loss (float): loss value
+
+
+        """
+        loss = None
+        if closure is not None:
+            loss = closure()
+
+        for group in self.param_groups:
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+
+                grad = p.grad.data
+                if group["weight_decay"] != 0:
+                    grad.add(p.data, alpha=group["weight_decay"])
+
+                # Gradient Equilibrium
+                equilibrum_grad = grad - grad.mean()
+                p.data -= group["lr"] * equilibrum_grad
+        return loss
+
+    def clip_grad_value(self, clip_value):
+        """
+        CLIp gradient value
+
+
+        """
+        for group in self.param_groups:
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                p.grad.data.clamp_(-clip_value, clip_value)
+
+    def add_weight_decay(self, weight_decay):
+        """
+        Add weight decay to the optimizer
+
+
+        """
+        for group in self.param_groups:
+            group["weight_decay"] = weight_decay
+
+    def state_dict(self):
+        return {
+            "state": self.state,
+            "param_groups": self.param_groups,
+        }
+
+    def load_state_dict(self, state_dict):
+        """Loads the optimizer state."""
+        self.param_groups = state_dict["param_groups"]
+        self.statet = state_dict["state"]
